@@ -15,7 +15,7 @@ export default function OnboardingPage() {
   const [account, setAccount] = useLocalStorage<Account | null>("account", null);
 
   // NFC scanning state machine
-  type NfcState = "idle" | "starting" | "scanning" | "ready" | "unsupported" | "error";
+  type NfcState = "idle" | "starting" | "scanning" | "ready" | "creating" | "unsupported" | "error";
   const [nfcState, setNfcState] = useState<NfcState>("idle");
   const startedRef = useRef(false);
 
@@ -29,7 +29,8 @@ export default function OnboardingPage() {
           idle: "准备 NFC...",
           starting: "正在开启 NFC 扫描…",
           scanning: "请将 NFC 卡片贴近手机…",
-          ready: "已读取 NFC，正在为您创建账户…",
+          ready: "已读取 NFC",
+          creating: "正在为您创建账户…",
           unsupported: "此浏览器不支持 Web NFC，请使用支持 NFC 的浏览器（如部分 Android 浏览器）。",
           error: "开启 NFC 扫描失败，请轻触屏幕一次以授权，或重试。",
         },
@@ -45,7 +46,8 @@ export default function OnboardingPage() {
         idle: "Preparing NFC...",
         starting: "Starting NFC scan…",
         scanning: "Bring the NFC card close to your phone…",
-        ready: "NFC read, creating your account…",
+  ready: "NFC read",
+  creating: "Creating your account…",
         unsupported: "This browser doesn't support Web NFC. Please use a browser with NFC support (Android only).",
         error: "Failed to start NFC scan. Tap the screen once to authorize, then try again.",
       },
@@ -121,11 +123,14 @@ export default function OnboardingPage() {
       return bytesToBase58(rnd);
     };
 
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
     const tryStart = async () => {
       if (cancelled || startedRef.current) return;
       try {
         startedRef.current = true;
         setNfcState("starting");
+        // small pre-scan delay for realism
+        await sleep(300 + Math.random() * 300);
         const Reader = (window as any).NDEFReader;
         ndef = new Reader();
         // Start scanning
@@ -141,6 +146,9 @@ export default function OnboardingPage() {
           const seed: string = event?.serialNumber || (crypto?.randomUUID?.() ?? Math.random().toString(36));
           const id = seed.replace(/[^a-zA-Z0-9]/g, "").slice(-8) || Math.random().toString(36).slice(2, 10);
           const address = await deriveAddress(seed);
+          // hold a creating phase for realism
+          setNfcState("creating");
+          await sleep(900 + Math.random() * 700);
           setAccount({ id, address, balanceFiat: 0, balanceSol: 0 });
         };
         ndef.onreadingerror = () => {
@@ -188,6 +196,7 @@ export default function OnboardingPage() {
               {nfcState === "starting" && labels.nfc.starting}
               {nfcState === "scanning" && labels.nfc.scanning}
               {nfcState === "ready" && labels.nfc.ready}
+              {nfcState === "creating" && labels.nfc.creating}
               {nfcState === "unsupported" && (
                 <span className="text-red-500">{labels.nfc.unsupported}</span>
               )}
@@ -195,6 +204,16 @@ export default function OnboardingPage() {
                 <span className="text-amber-500">{labels.nfc.error}</span>
               )}
             </div>
+            {(nfcState === "starting" || nfcState === "scanning" || nfcState === "creating") && (
+              <div className="mt-4 flex items-center gap-2 text-xs">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-neutral-300 border-t-transparent" />
+                <span className="opacity-80">
+                  {nfcState === "starting" && (lang === "zh" ? "初始化 NFC…" : "Initializing NFC…")}
+                  {nfcState === "scanning" && (lang === "zh" ? "等待贴卡…" : "Waiting for tag…")}
+                  {nfcState === "creating" && (lang === "zh" ? "生成账户与密钥…" : "Generating account…")}
+                </span>
+              </div>
+            )}
             {account && (
               <div className="mt-3 text-xs">
                 <div>• {labels.created}</div>

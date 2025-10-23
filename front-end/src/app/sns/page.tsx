@@ -60,22 +60,37 @@ export default function SnsPage() {
         };
   }, [lang]);
 
-  const checkAvailability = async () => {
+  const checkAvailability = async (): Promise<boolean> => {
+    if (!name) return false;
     setStatus("checking");
-    // Mock result: simple hash to flip availability
-    await new Promise((r) => setTimeout(r, 500));
+  const wait = 800 + Math.random() * 400; // 0.8s-1.2s
+  await new Promise((r) => setTimeout(r, wait));
     const h = Array.from(name).reduce((s, c) => s + c.charCodeAt(0), 0);
     const ok = h % 3 !== 0 && name.length >= 3;
     setStatus(ok ? "available" : "taken");
+    return ok;
   };
 
   const registerSns = async () => {
     if (!account || status !== "available" || !name) return;
-    setStatus("registering");
-    await new Promise((r) => setTimeout(r, 900));
+  setStatus("registering");
+  const wait = 1500 + Math.random() * 700; // 1.5s-2.2s
+  await new Promise((r) => setTimeout(r, wait));
     const domain = `${name}.sol`;
     setAccount({ ...account, sns: domain });
     setStatus("success");
+  };
+
+  const onRegisterClick = async () => {
+    if (!account || !name) return;
+    // If not available yet, run check first
+    if (status === "idle" || status === "taken") {
+      const ok = await checkAvailability();
+      if (!ok) return;
+    }
+    if (status === "available") {
+      await registerSns();
+    }
   };
 
   return (
@@ -95,27 +110,41 @@ export default function SnsPage() {
                     placeholder={t.placeholder}
                     className="flex-1 rounded-lg border px-3 py-2 text-sm font-mono"
                   />
-                  <div className="px-2 py-1 rounded border text-xs min-w-20 text-center">
+                  <div className="px-2 py-1 rounded border text-xs min-w-24 text-center flex items-center justify-center gap-2">
+                    {status === "checking" && (
+                      <span className="inline-block h-3 w-3 rounded-full border-2 border-neutral-300 border-t-transparent animate-spin" />
+                    )}
+                    {status === "registering" && (
+                      <span className="inline-block h-3 w-3 rounded-full border-2 border-neutral-300 border-t-transparent animate-spin" />
+                    )}
                     {status === "idle" && t.preview}
-                    {status === "checking" && "…"}
+                    {status === "checking" && (lang === "zh" ? "检查中…" : "Checking…")}
                     {status === "available" && t.available}
                     {status === "taken" && t.taken}
-                    {status === "registering" && "…"}
+                    {status === "registering" && (lang === "zh" ? "注册中…" : t.registering)}
                     {status === "success" && t.registered}
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={checkAvailability} className="rounded-lg border px-3 py-1.5 text-sm" disabled={!name || status === "checking" || status === "registering"}>
+                  <button onClick={checkAvailability} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-50" disabled={!name || status === "checking" || status === "registering"}>
                     {t.check}
                   </button>
                   <button
-                    onClick={registerSns}
-                    disabled={status !== "available"}
-                    className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-50"
+                    onClick={onRegisterClick}
+                    disabled={!name || status === "checking" || status === "registering"}
+                    className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-50 inline-flex items-center gap-2"
                   >
+                    {status === "registering" && (
+                      <span className="inline-block h-4 w-4 rounded-full border-2 border-neutral-300 border-t-transparent animate-spin" />
+                    )}
                     {status === "registering" ? t.registering : t.register}
                   </button>
                 </div>
+                {(status === "checking" || status === "registering") && (
+                  <div className="h-1 w-full rounded bg-neutral-200 dark:bg-neutral-800 overflow-hidden">
+                    <div className="h-full w-1/3 bg-neutral-400/70 dark:bg-neutral-500/70 animate-[progress_1.2s_ease_infinite]" />
+                  </div>
+                )}
                 <div className="grid md:grid-cols-2 gap-3">
                   <div className="rounded-lg border p-3 text-xs">
                     <div className="font-medium mb-2">{t.summary}</div>
