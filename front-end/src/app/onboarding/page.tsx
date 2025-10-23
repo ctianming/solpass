@@ -69,6 +69,58 @@ export default function OnboardingPage() {
       return;
     }
 
+    const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    const bytesToBase58 = (source: Uint8Array) => {
+      if (!source || source.length === 0) return "";
+      const BASE = 58;
+      const LEADER = alphabet[0];
+      // Count leading zeros
+      let zeros = 0;
+      while (zeros < source.length && source[zeros] === 0) zeros++;
+      // Size estimation per base-x
+      const size = (((source.length - zeros) * 138) / 100 + 1) | 0;
+      const b58 = new Uint8Array(size);
+      let length = 0;
+      for (let i = zeros; i < source.length; i++) {
+        let carry = source[i];
+        let j = 0;
+        for (let k = size - 1; (carry !== 0 || j < length) && k >= 0; k--, j++) {
+          carry += 256 * b58[k];
+          b58[k] = carry % BASE;
+          carry = (carry / BASE) | 0;
+        }
+        length = j;
+      }
+      // Skip leading zeros in base58 result
+      let it = size - length;
+      while (it < size && b58[it] === 0) it++;
+      let str = "";
+      for (let i = 0; i < zeros; i++) str += LEADER;
+      for (; it < size; ++it) str += alphabet[b58[it]];
+      return str;
+    };
+
+    const deriveAddress = async (seed: string): Promise<string> => {
+      try {
+        if (crypto?.subtle?.digest) {
+          const enc = new TextEncoder().encode(seed);
+          const buf = await crypto.subtle.digest("SHA-256", enc);
+          const hash = new Uint8Array(buf);
+          const b58 = bytesToBase58(hash);
+          // Typical Solana pubkeys are ~43-44 chars; if short, pad by re-encoding extra zero
+          if (b58.length < 43) {
+            const extended = bytesToBase58(new Uint8Array([...hash, 0]));
+            return extended.slice(0, 44);
+          }
+          return b58.slice(0, 44);
+        }
+      } catch {}
+      // Fallback random base58
+      const rnd = new Uint8Array(32);
+      (crypto?.getRandomValues ? crypto.getRandomValues(rnd) : rnd.fill(7));
+      return bytesToBase58(rnd);
+    };
+
     const tryStart = async () => {
       if (cancelled || startedRef.current) return;
       try {
@@ -81,16 +133,14 @@ export default function OnboardingPage() {
         if (cancelled) return;
         setNfcState("scanning");
 
-        ndef.onreading = (event: any) => {
+        ndef.onreading = async (event: any) => {
           if (cancelled) return;
           if (account) return;
           setNfcState("ready");
           // Use NFC serialNumber or fallback random to deterministically derive an ID
           const seed: string = event?.serialNumber || (crypto?.randomUUID?.() ?? Math.random().toString(36));
           const id = seed.replace(/[^a-zA-Z0-9]/g, "").slice(-8) || Math.random().toString(36).slice(2, 10);
-          // Build a pseudo address (mock)
-          const base = btoa(unescape(encodeURIComponent(seed))).replace(/[^a-zA-Z0-9]/g, "");
-          const address = ("So" + base).slice(0, 32).padEnd(32, "x");
+          const address = await deriveAddress(seed);
           setAccount({ id, address, balanceFiat: 0, balanceSol: 0 });
         };
         ndef.onreadingerror = () => {
