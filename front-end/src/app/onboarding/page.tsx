@@ -230,8 +230,12 @@ export default function OnboardingPage() {
   }, [account, snsOpen]);
 
   // sns helpers
+  const isNameValid = (s: string) => /^[a-z0-9-]{3,}$/.test(s);
   const checkAvailability = async (): Promise<boolean> => {
-    if (!snsName) return false;
+    if (!isNameValid(snsName)) {
+      setSnsStatus("error");
+      return false;
+    }
     setSnsStatus("checking");
     await new Promise((r) => setTimeout(r, 800 + Math.random() * 400));
     const h = Array.from(snsName).reduce((s, c) => s + c.charCodeAt(0), 0);
@@ -340,8 +344,15 @@ export default function OnboardingPage() {
                 <input
                   value={snsName}
                   onChange={(e) => setSnsName(e.target.value.replace(/[^a-z0-9-]/g, "").toLowerCase())}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void doRegister();
+                    }
+                  }}
                   placeholder={labels.sns.placeholder}
                   className="flex-1 rounded-lg border px-3 py-2 text-sm font-mono"
+                  autoFocus
                 />
                 <div className="px-2 py-1 rounded border text-xs min-w-24 text-center flex items-center justify-center gap-2">
                   {snsStatus === "checking" && (
@@ -358,15 +369,23 @@ export default function OnboardingPage() {
                   {snsStatus === "success" && labels.sns.registered}
                 </div>
               </div>
+              {/* helper text */}
+              {snsStatus === "error" && (
+                <div className="text-[11px] text-red-500">{lang === "zh" ? "名称至少3个字符，仅限小写字母、数字和-" : "At least 3 chars, lowercase letters, digits and - only"}</div>
+              )}
+              {snsStatus === "taken" && (
+                <div className="text-[11px] text-amber-600">{lang === "zh" ? "该名称已被占用" : "Name is taken"}</div>
+              )}
+
               <div className="flex gap-2">
-                <button onClick={checkAvailability} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-50" disabled={!snsName || snsStatus === "checking" || snsStatus === "registering"}>
+                <button onClick={checkAvailability} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled={!snsName || snsStatus === "checking" || snsStatus === "registering"}>
                   {labels.sns.check}
                 </button>
-                <button onClick={doRegister} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-50 inline-flex items-center gap-2" disabled={!snsName || snsStatus === "registering"}>
-                  {snsStatus === "registering" && (
+                <button onClick={doRegister} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2" disabled={!snsName || snsStatus === "checking" || snsStatus === "registering"}>
+                  {(snsStatus === "checking" || snsStatus === "registering") && (
                     <span className="inline-block h-4 w-4 rounded-full border-2 border-neutral-300 border-t-transparent animate-spin" />
                   )}
-                  {labels.sns.register}
+                  {snsStatus === "checking" ? (lang === "zh" ? "检查中…" : "Checking…") : labels.sns.register}
                 </button>
               </div>
               <div className="rounded-lg border p-3 text-xs grid gap-1">
