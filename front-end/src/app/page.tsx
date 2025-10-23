@@ -192,7 +192,7 @@ export default function Home() {
           <SectionCard
             title={t.snsTitle}
             actions={
-              <Link className="rounded-lg border px-3 py-1.5 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800" href="/sns">
+              <Link className="rounded-lg border px-3 py-1.5 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800" href="/onboarding?sns=1">
                 {t.snsRegister}
               </Link>
             }

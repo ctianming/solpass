@@ -3,6 +3,7 @@
 import { AppShell } from "@/components/AppShell";
 import { SectionCard } from "@/components/SectionCard";
 import { PassCard } from "@/components/PassCard";
+import { FlippablePassCard } from "@/components/FlippablePassCard";
 import { AccountCard } from "@/components/AccountCard";
 import { useLocalStorage } from "@/lib/useLocalStorage";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -13,6 +14,11 @@ type Account = { id: string; address: string; sns?: string; balanceFiat: number;
 export default function OnboardingPage() {
   const [lang] = useLocalStorage<Lang>("lang", "zh");
   const [account, setAccount] = useLocalStorage<Account | null>("account", null);
+  // SNS modal state
+  const [snsOpen, setSnsOpen] = useState(false);
+  const [snsName, setSnsName] = useState("");
+  type SnsStatus = "idle" | "checking" | "available" | "taken" | "registering" | "success" | "error";
+  const [snsStatus, setSnsStatus] = useState<SnsStatus>("idle");
 
   // NFC scanning state machine
   type NfcState = "idle" | "starting" | "scanning" | "ready" | "creating" | "unsupported" | "error";
@@ -37,6 +43,17 @@ export default function OnboardingPage() {
         created: "账户创建完成",
         id: "ID",
         address: "地址",
+        sns: {
+          title: "注册域名",
+          open: "注册 SNS 域名",
+          placeholder: "输入你想要的名称",
+          check: "检查可用性",
+          available: "可用",
+          taken: "已被占用",
+          register: "注册域名",
+          registering: "正在注册…",
+          registered: "域名注册完成",
+        },
       };
     }
     return {
@@ -54,6 +71,17 @@ export default function OnboardingPage() {
       created: "Account created",
       id: "ID",
       address: "Address",
+      sns: {
+        title: "Register domain",
+        open: "Register SNS domain",
+        placeholder: "Enter desired name",
+        check: "Check availability",
+        available: "Available",
+        taken: "Taken",
+        register: "Register domain",
+        registering: "Registering…",
+        registered: "Domain registered",
+      },
     };
   }, [lang]);
 
@@ -186,11 +214,51 @@ export default function OnboardingPage() {
     };
   }, [account]);
 
+  // Open SNS modal via query param (client-only)
+  useEffect(() => {
+    if (!account || snsOpen) return;
+    try {
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        const want = params.get("sns");
+        if (want === "1") {
+          setSnsOpen(true);
+          setSnsStatus("idle");
+        }
+      }
+    } catch {}
+  }, [account, snsOpen]);
+
+  // sns helpers
+  const checkAvailability = async (): Promise<boolean> => {
+    if (!snsName) return false;
+    setSnsStatus("checking");
+    await new Promise((r) => setTimeout(r, 800 + Math.random() * 400));
+    const h = Array.from(snsName).reduce((s, c) => s + c.charCodeAt(0), 0);
+    const ok = h % 3 !== 0 && snsName.length >= 3;
+    setSnsStatus(ok ? "available" : "taken");
+    return ok;
+  };
+  const doRegister = async () => {
+    if (!account || !snsName || (snsStatus !== "available" && snsStatus !== "checking")) return;
+    if (snsStatus === "checking") {
+      const ok = await checkAvailability();
+      if (!ok) return;
+    }
+    setSnsStatus("registering");
+    await new Promise((r) => setTimeout(r, 1500 + Math.random() * 700));
+    const domain = `${snsName}.sol`;
+    setAccount({ ...account, sns: domain });
+    setSnsStatus("success");
+    setTimeout(() => setSnsOpen(false), 800);
+  };
+
   return (
     <AppShell>
       <div className="grid md:grid-cols-2 gap-6 items-start">
         <div className="space-y-5">
           <h1 className="text-2xl font-bold">{lang === "zh" ? "NFC 一贴创建账户" : "NFC onboarding"}</h1>
+          {!account && (
           <SectionCard title={labels.title}>
             {labels.desc}
             <div className="mt-3 text-xs opacity-80">
@@ -216,25 +284,25 @@ export default function OnboardingPage() {
                 </span>
               </div>
             )}
-            {account && nfcState !== "creating" && (
-              <div className="mt-3 text-xs">
-                <div>• {labels.created}</div>
-                <div>• {labels.id}: <span className="font-mono">{account.id}</span></div>
-                <div>• {labels.address}: <span className="font-mono break-all">{account.address}</span></div>
-              </div>
-            )}
+            {/* After creation, the text card no longer shows details — use the flippable card + SNS modal */}
           </SectionCard>
+          )}
         </div>
         <div className="flex justify-center md:justify-end">
           {account && nfcState !== "creating" ? (
-            <AccountCard
-              id={account.id}
-              address={account.address}
-              sns={account.sns}
-              balanceFiat={account.balanceFiat}
-              balanceSol={account.balanceSol}
-              lang={lang}
-            />
+            <div className="flex flex-col items-center gap-4">
+              <FlippablePassCard address={account.address} name={account.sns ?? null} lang={lang} />
+              <button
+                onClick={() => {
+                  setSnsOpen(true);
+                  setSnsStatus("idle");
+                  setSnsName("");
+                }}
+                className="rounded-full border px-4 py-2 text-sm"
+              >
+                {labels.sns.open}
+              </button>
+            </div>
           ) : (
             <PassCard active={false} name={lang === "zh" ? "未命名" : "Unnamed"} />
           )}
@@ -251,6 +319,61 @@ export default function OnboardingPage() {
             </div>
             <div className="text-sm opacity-90">
               {lang === "zh" ? "正在为您创建账户…" : "Creating your account…"}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SNS modal */}
+      {snsOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 backdrop-blur-sm p-4" onClick={() => setSnsOpen(false)}>
+          <div className="w-full max-w-md rounded-2xl border bg-white dark:bg-neutral-900 p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="text-lg font-semibold mb-2">{labels.sns.title}</div>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <input
+                  value={snsName}
+                  onChange={(e) => setSnsName(e.target.value.replace(/[^a-z0-9-]/g, "").toLowerCase())}
+                  placeholder={labels.sns.placeholder}
+                  className="flex-1 rounded-lg border px-3 py-2 text-sm font-mono"
+                />
+                <div className="px-2 py-1 rounded border text-xs min-w-24 text-center flex items-center justify-center gap-2">
+                  {snsStatus === "checking" && (
+                    <span className="inline-block h-3 w-3 rounded-full border-2 border-neutral-300 border-t-transparent animate-spin" />
+                  )}
+                  {snsStatus === "registering" && (
+                    <span className="inline-block h-3 w-3 rounded-full border-2 border-neutral-300 border-t-transparent animate-spin" />
+                  )}
+                  {snsStatus === "idle" && (lang === "zh" ? "预览" : "Preview")}
+                  {snsStatus === "checking" && (lang === "zh" ? "检查中…" : "Checking…")}
+                  {snsStatus === "available" && labels.sns.available}
+                  {snsStatus === "taken" && labels.sns.taken}
+                  {snsStatus === "registering" && labels.sns.registering}
+                  {snsStatus === "success" && labels.sns.registered}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={checkAvailability} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-50" disabled={!snsName || snsStatus === "checking" || snsStatus === "registering"}>
+                  {labels.sns.check}
+                </button>
+                <button onClick={doRegister} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-50 inline-flex items-center gap-2" disabled={!snsName || snsStatus === "checking" || snsStatus === "registering"}>
+                  {snsStatus === "registering" && (
+                    <span className="inline-block h-4 w-4 rounded-full border-2 border-neutral-300 border-t-transparent animate-spin" />
+                  )}
+                  {labels.sns.register}
+                </button>
+              </div>
+              <div className="rounded-lg border p-3 text-xs grid gap-1">
+                <div className="flex justify-between py-0.5"><span className="text-neutral-500">{lang === "zh" ? "域名" : "Domain"}</span><span className="font-mono">{snsName ? `${snsName}.sol` : "-"}</span></div>
+                <div className="flex justify-between py-0.5"><span className="text-neutral-500">{lang === "zh" ? "所有者" : "Owner"}</span><span className="font-mono">{account?.address.slice(0,4)}…{account?.address.slice(-4)}</span></div>
+                <div className="flex justify-between py-0.5"><span className="text-neutral-500">{lang === "zh" ? "费用" : "Fee"}</span><span>{lang === "zh" ? "代付（0 SOL）" : "Sponsored (0 SOL)"}</span></div>
+                <div className="flex justify-between py-0.5"><span className="text-neutral-500">{lang === "zh" ? "有效期" : "Expiry"}</span><span>{lang === "zh" ? "1 年" : "1 year"}</span></div>
+              </div>
+              {snsStatus === "success" && (
+                <div className="rounded-lg border p-3 text-xs bg-emerald-50/50 dark:bg-emerald-900/10">
+                  <div>• {labels.sns.registered}: <span className="font-mono">{account?.sns}</span></div>
+                </div>
+              )}
             </div>
           </div>
         </div>
