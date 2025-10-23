@@ -150,6 +150,8 @@ export default function OnboardingPage() {
           setNfcState("creating");
           await sleep(900 + Math.random() * 700);
           setAccount({ id, address, balanceFiat: 0, balanceSol: 0 });
+          // exit creating state so UI can reveal account
+          setNfcState("ready");
         };
         ndef.onreadingerror = () => {
           if (!cancelled) setNfcState("error");
@@ -214,7 +216,7 @@ export default function OnboardingPage() {
                 </span>
               </div>
             )}
-            {account && (
+            {account && nfcState !== "creating" && (
               <div className="mt-3 text-xs">
                 <div>• {labels.created}</div>
                 <div>• {labels.id}: <span className="font-mono">{account.id}</span></div>
@@ -224,7 +226,7 @@ export default function OnboardingPage() {
           </SectionCard>
         </div>
         <div className="flex justify-center md:justify-end">
-          {account ? (
+          {account && nfcState !== "creating" ? (
             <AccountCard
               id={account.id}
               address={account.address}
@@ -238,6 +240,21 @@ export default function OnboardingPage() {
           )}
         </div>
       </div>
+
+      {/* Full-screen loader overlay during account creation */}
+      {nfcState === "creating" && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-white/70 dark:bg-neutral-950/70 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-4">
+            <div className="relative h-24 w-24">
+              <div className="absolute inset-0 rounded-full animate-spin [animation-duration:1.2s] bg-[conic-gradient(#22c55e,#06b6d4,#8b5cf6,#22c55e)]" />
+              <div className="absolute inset-2 rounded-full bg-white dark:bg-neutral-950" />
+            </div>
+            <div className="text-sm opacity-90">
+              {lang === "zh" ? "正在为您创建账户…" : "Creating your account…"}
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }
