@@ -240,10 +240,16 @@ export default function OnboardingPage() {
     return ok;
   };
   const doRegister = async () => {
-    if (!account || !snsName || (snsStatus !== "available" && snsStatus !== "checking")) return;
-    if (snsStatus === "checking") {
+    if (!account || !snsName) return;
+    // If not already available, try checking first
+    if (snsStatus === "idle" || snsStatus === "taken") {
       const ok = await checkAvailability();
       if (!ok) return;
+    } else if (snsStatus === "checking") {
+      const ok = await checkAvailability();
+      if (!ok) return;
+    } else if (snsStatus !== "available") {
+      return;
     }
     setSnsStatus("registering");
     await new Promise((r) => setTimeout(r, 1500 + Math.random() * 700));
@@ -356,7 +362,7 @@ export default function OnboardingPage() {
                 <button onClick={checkAvailability} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-50" disabled={!snsName || snsStatus === "checking" || snsStatus === "registering"}>
                   {labels.sns.check}
                 </button>
-                <button onClick={doRegister} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-50 inline-flex items-center gap-2" disabled={!snsName || snsStatus === "checking" || snsStatus === "registering"}>
+                <button onClick={doRegister} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-50 inline-flex items-center gap-2" disabled={!snsName || snsStatus === "registering"}>
                   {snsStatus === "registering" && (
                     <span className="inline-block h-4 w-4 rounded-full border-2 border-neutral-300 border-t-transparent animate-spin" />
                   )}

@@ -18,7 +18,7 @@ export function FlippablePassCard({ address, name, className = "", lang = "zh" }
     let mounted = true;
     const gen = async () => {
       try {
-        const url = await QRCode.toDataURL(address, { width: 264, margin: 1 });
+        const url = await QRCode.toDataURL(address, { width: 320, margin: 1 });
         if (mounted) setQr(url);
       } catch {}
     };
@@ -35,27 +35,27 @@ export function FlippablePassCard({ address, name, className = "", lang = "zh" }
   }, [name, address, lang]);
 
   return (
-    <div className={`[perspective:1000px] ${className}`}>
+  <div className={`[perspective:1200px] ${className}`}>
       <div
-        className="relative h-72 w-48 sm:h-80 sm:w-56 md:h-96 md:w-64 [transform-style:preserve-3d] transition-transform duration-500 cursor-pointer"
+    className="relative h-96 w-64 sm:h-[28rem] sm:w-80 md:h-[32rem] md:w-96 [transform-style:preserve-3d] transition-transform duration-500 cursor-pointer"
         onClick={() => setFlipped((v) => !v)}
         style={{ transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)" }}
       >
         {/* Front */}
-        <div className="absolute inset-0 rounded-2xl border bg-gradient-to-br from-emerald-400/70 to-indigo-400/70 dark:from-emerald-500/20 dark:to-indigo-500/20 shadow-xl p-5 [backface-visibility:hidden]">
+    <div className="absolute inset-0 rounded-3xl border bg-gradient-to-br from-emerald-400/70 to-indigo-400/70 dark:from-emerald-500/20 dark:to-indigo-500/20 shadow-2xl p-6 [backface-visibility:hidden]">
           <div className="flex h-full flex-col justify-between">
             <div className="text-sm opacity-80">Solana Pass</div>
-            <div className="text-2xl font-extrabold tracking-wide">
+      <div className="text-3xl md:text-4xl font-extrabold tracking-wide">
               {display}
             </div>
-            <div className="text-[10px] opacity-80">{lang === "zh" ? "轻触翻转，查看二维码" : "Tap to flip for QR"}</div>
+      <div className="text-xs opacity-80">{lang === "zh" ? "轻触翻转，查看二维码" : "Tap to flip for QR"}</div>
           </div>
         </div>
 
         {/* Back */}
-        <div className="absolute inset-0 rounded-2xl border bg-white dark:bg-neutral-900 shadow-xl p-4 grid place-items-center [transform:rotateY(180deg)] [backface-visibility:hidden]">
+    <div className="absolute inset-0 rounded-3xl border bg-white dark:bg-neutral-900 shadow-2xl p-6 grid place-items-center [transform:rotateY(180deg)] [backface-visibility:hidden]">
           {qr ? (
-            <img src={qr} alt="QR" className="h-56 w-56 object-contain" />
+      <img src={qr} alt="QR" className="h-72 w-72 object-contain" />
           ) : (
             <div className="h-10 w-10 animate-spin rounded-full border-2 border-neutral-300 border-t-transparent" />
           )}
