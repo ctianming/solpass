@@ -3,6 +3,7 @@
 import { AppShell } from "@/components/AppShell";
 import { SectionCard } from "@/components/SectionCard";
 import { PassCard } from "@/components/PassCard";
+import { AccountCard } from "@/components/AccountCard";
 import { useLocalStorage } from "@/lib/useLocalStorage";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -154,7 +155,18 @@ export default function OnboardingPage() {
           </SectionCard>
         </div>
         <div className="flex justify-center md:justify-end">
-          <PassCard active={!!account} name={account?.sns ?? (lang === "zh" ? "未命名" : "Unnamed")} id={account?.id ?? undefined} />
+          {account ? (
+            <AccountCard
+              id={account.id}
+              address={account.address}
+              sns={account.sns}
+              balanceFiat={account.balanceFiat}
+              balanceSol={account.balanceSol}
+              lang={lang}
+            />
+          ) : (
+            <PassCard active={false} name={lang === "zh" ? "未命名" : "Unnamed"} />
+          )}
         </div>
       </div>
     </AppShell>
